@@ -13,3 +13,5 @@ FlareSolverr - Electron is based on same API than Flaresolverr
 No captcha solver implemented
 
 No support for ARM
+
+No support for proxy
