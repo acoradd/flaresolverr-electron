@@ -1,5 +1,6 @@
 # FlareSolverr - Electron
 - [GitHub](https://github.com/acoradd/flaresolverr-electron)
+- [DockerHub](https://hub.docker.com/r/accoradd/flaresolver-electron)
 
 ## Fork of FlareSolverr project
 FlareSolverr - Electron is based on same API than Flaresolverr
