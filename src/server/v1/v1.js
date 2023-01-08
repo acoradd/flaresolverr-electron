@@ -1,4 +1,4 @@
-const {version} = require('../config');
+const {version, logRequestCookie} = require('../config');
 
 const {server} = require('../server');
 
@@ -14,8 +14,14 @@ const commands = {
   'request.post': request.post,
 }
 
+let nbRequest = 0;
+function incRequestAndGet() {
+  return nbRequest++;
+}
+
 server.post('/v1',  async (req, res) => {
   const params = req.body;
+  const numRequest = incRequestAndGet();
 
   const response = {
     status: null,
@@ -28,6 +34,8 @@ server.post('/v1',  async (req, res) => {
   try {
     checkParams(params);
 
+    console.info(`Request [${numRequest}] : CMD="${params.cmd}"URL="${params.url}",TIMEOUT="${params.maxTimeout}",ONLY_COOKIE=${params.returnOnlyCookies} |`, logRequestCookie ? params.cookies : null);
+
     await executeCommand(params, response);
 
   } catch (e) {
@@ -38,7 +46,7 @@ server.post('/v1',  async (req, res) => {
   }
 
   response.endTimestamp = Date.now();
-  console.info(`Response in ${(response.endTimestamp - response.startTimestamp) / 1000} s`);
+  console.info(`Request [${numRequest}] - Response in ${(response.endTimestamp - response.startTimestamp) / 1000} s`);
   res.send(response);
 })
 

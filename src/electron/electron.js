@@ -1,24 +1,38 @@
 const {app, BrowserWindow} = require('electron');
 const path = require('path');
-const {shareCookie} = require('../server/config');
 
 
 app.on('window-all-closed', () => {
   app.quit();
 })
 
+async function editWindow(window) {
+
+  window.webContents.setUserAgent(
+    window.webContents.getUserAgent().split(' ')
+      .filter(userAgentPart => {
+        return !userAgentPart.toLowerCase().startsWith('flaresolverr')
+          && !userAgentPart.toLowerCase().startsWith('electron')
+      })
+      .join(' ')
+  );
+
+  return window;
+}
+
 async function createWindow(withPreload = true) {
 
   await app.whenReady();
 
-  return new BrowserWindow({
-    width: 1920,
-    height: 1080,
-    webPreferences: {
-      preload: withPreload ? path.join(__dirname, 'preload.js') : undefined,
-      partition: shareCookie ? undefined : `${Date.now()}`
-    }
-  });
+  return await editWindow(
+    new BrowserWindow({
+      width: 1920,
+      height: 1080,
+      webPreferences: {
+        preload: withPreload ? path.join(__dirname, 'preload.js') : undefined,
+      }
+    })
+  );
 }
 
 async function createWindowAndNavigateToUrl(url) {

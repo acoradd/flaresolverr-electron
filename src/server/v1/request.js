@@ -44,7 +44,7 @@ async function executeRequest(params) {
   }
 
   try {
-    return  await solverService.resolveChallenge(params, session)
+    return await solverService.resolveChallenge(params, session)
   } catch (error) {
     throw Error("Unable to process browser request. " + error)
   } finally {

@@ -1,5 +1,5 @@
 const Timeout = require('await-timeout');
-const {getBaseUrl} = require('../../utils');
+const {getBaseUrl, Optional} = require('../../utils');
 
 const RETRIVE_BODY_CODE = `
 function gethtml () {
@@ -12,8 +12,10 @@ async function goToPage(params, window) {
   return new Promise((resolve, reject) => {
 
     window.webContents.session.webRequest.onCompleted((details) => {
-      window.webContents.session.webRequest.onCompleted(null);
-      return resolve(details);
+      if (details.resourceType === 'mainFrame') {
+        window.webContents.session.webRequest.onCompleted(null);
+        return resolve(details);
+      }
     });
 
     if (params.method === 'POST') {
@@ -27,12 +29,19 @@ async function goToPage(params, window) {
   })
 }
 
-function getCookieUrl(cookie, params) {
-  if (cookie.url) {
-    return cookie.url;
-  } else {
-    return params.baseUrl;
+async function _solveChallenge(params, window, nbTentative) {
+
+  const challengeSolver = `
+  function sdfgs () {
+      return new Promise((resolve) => {
+        setTimeout(() => resolve(), ${nbTentative * 1000});
+      });
   }
+  
+  sdfgs();
+  `;
+
+  return window.webContents.executeJavaScript(challengeSolver, true)
 }
 
 function getCookies(params) {
@@ -41,8 +50,13 @@ function getCookies(params) {
       return {
         name: cookie.name,
         value: cookie.value,
-        url: getCookieUrl(cookie, params),
-        domain: cookie.domain
+        url: Optional.of(cookie.url).orElse(params.baseUrl),
+        domain: cookie.domain,
+        path: Optional.of(cookie.path).orElse('/'),
+        secure: Optional.of(cookie.secure).orElse(true),
+        httpOnly: Optional.of(cookie.httpOnly).orElse(true),
+        expirationDate: Optional.of(cookie.expires).map(val => Math.trunc(val)).orElse(10),
+        sameSite: Optional.of(cookie.sameSite).map(getCookieSameSiteForSend).orElse('no_restriction')
       };
     });
   }
@@ -76,7 +90,7 @@ async function getHeadersFromResponse(response) {
   return result;
 }
 
-function getCookieSameSite(cookieSameSite) {
+function getCookieSameSiteForResponse(cookieSameSite) {
   switch (cookieSameSite.toLowerCase()) {
     case 'unspecified': return 'None';
     case 'no_restriction': return 'None';
@@ -85,20 +99,29 @@ function getCookieSameSite(cookieSameSite) {
   }
 }
 
+function getCookieSameSiteForSend(cookieSameSite) {
+  switch (cookieSameSite.toLowerCase()) {
+    case 'None': return 'no_restriction';
+    case 'lax': return 'lax';
+    case 'strict': return 'strict';
+    default: 'no_restriction';
+  }
+}
+
 function getCookieForResponse(cookies) {
   return cookies
     .map(cookie => {
       return {
-        name: cookie.name,
-        value: cookie.value,
         domain: cookie.domain,
-        path: cookie.path,
-        expires: cookie.expirationDate,
-        size: cookie.name.length + cookie.value.length,
+        expires: Math.trunc(cookie.expirationDate) - 600,
         httpOnly: cookie.httpOnly,
+        name: cookie.name,
+        path: cookie.path,
+        sameSite: getCookieSameSiteForResponse(cookie.sameSite),
         secure: cookie.secure,
-        session: cookie.session,
-        sameSite: getCookieSameSite(cookie.sameSite)
+        value: cookie.value,
+        size: cookie.name.length + cookie.value.length,
+        session: cookie.session
       }
     });
 }
@@ -120,6 +143,13 @@ async function resolveChallenge(params, session) {
     await updatePageCookie(params, window);
 
     let response = await goToPage(params, window);
+    let nbTentative = 0;
+
+    while (response.statusCode === 403) {
+      console.warn('Challenge detected');
+      await _solveChallenge(params, window, ++nbTentative);
+      response = await goToPage(params, window);
+    }
 
     const webContents = window.webContents;
 
